@@ -1,4 +1,3 @@
-markdown
 # Docker Multi-Container Application
 
 Uma aplicação CRUD completa com FastAPI e PostgreSQL usando Docker Compose.
