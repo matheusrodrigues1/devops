@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  app:
+    # 🚨 MUDANÇA PRINCIPAL: Usar a imagem do Docker Hub
+    image: seu-docker-username/seu-repo-app:${IMAGE_TAG} # Substitua 'seu-docker-username/seu-repo-app'
+    container_name: fastapi_app_prod
+    ports:
+      - "8000:8000"
+    environment:
+      # A URL do DB será carregada do .env de produção
+      - DATABASE_URL=postgresql://app_user:${DB_APP_PASSWORD}@db:5432/${DB_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      # Adicione a tag da imagem para rastreamento
+      - IMAGE_TAG=${IMAGE_TAG} 
+    depends_on:
+      # Mantenha a dependência no serviço 'db' para produção
+      db:
+        condition: service_healthy # Use a healthcheck para mais robustez
+    networks:
+      - app-network
+    # Remove a montagem de volume para código: a imagem já contém o código
+    # volumes: 
+    #   - ./app:/app 
+    restart: always
+    # O comando de produção deve ser o padrão da imagem (CMD no Dockerfile)
+    # command: ["./scripts/wait-for-db.sh", "db", "5432", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  db:
+    # Use a imagem do postgres
+    image: postgres:15-alpine
+    container_name: postgres_db_prod
+    environment:
+      # Variáveis do DB carregadas do .env de produção
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_APP_USER=app_user
+      - POSTGRES_APP_PASSWORD=${DB_APP_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Não é necessário copiar o init.sql em um restart normal de produção
+    networks:
+      - app-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Não exponha a porta 5432 diretamente em produção, a menos que seja necessário
+    # ports:
+    #   - "5432:5432"
+
+volumes:
+  postgres_data:
+    # Defina o driver de volume aqui para persistência de dados
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
